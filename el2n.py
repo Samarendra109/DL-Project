@@ -2,10 +2,12 @@ import torch
 from torch import nn, optim
 import copy
 from tqdm import tqdm
+from torch.utils.data import Dataset, DataLoader
+from data_utils import IndexDataset
 
 
 class EL2NMetric:
-    def __init__(self, model, num_models, device):
+    def __init__(self, model: nn.Module, num_models: int, device: torch.device):
 
         self.model_list = nn.ModuleList(
             [copy.deepcopy(model) for _ in range(num_models)]
@@ -22,7 +24,7 @@ class EL2NMetric:
         # Hardcoding the optimizer (Can extend the class to overwrite it)
         return optim.SGD(self.model_list.parameters(), lr=0.001, momentum=0.9)
 
-    def train_step(self, train_loader):
+    def train_step(self, train_loader: DataLoader):
 
         for data in tqdm(train_loader):
             # get the inputs; data is a list of [inputs, labels]
@@ -41,17 +43,26 @@ class EL2NMetric:
             total_loss.backward()
             self.optimizer.step()
 
-    def train(self, train_loader, epochs):
+    def train(self, train_loader: DataLoader, epochs: int):
 
         for i in range(epochs):
             print(f"Epoch {i}\n")
             self.train_step(train_loader)
 
-    def get_metric(self, data_loader):
+    def get_metric(self, dataset: Dataset):
+
+        index_list = []
+        metric_list = []
+
+        dataset = IndexDataset(dataset)
+
+        data_loader = DataLoader(
+            dataset, batch_size=256, shuffle=False, num_workers=2  # Hardcoding for now
+        )
 
         with torch.no_grad():
 
-            for data in data_loader:
+            for index, data in data_loader:
                 # get the inputs; data is a list of [inputs, labels]
                 inputs, labels = data
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
@@ -72,5 +83,9 @@ class EL2NMetric:
                     else:
                         total_loss += loss / len(self.model_list)
 
-                # For now simply priting, will later figure out what to do.
-                print(total_loss.size())
+                total_loss = total_loss.mean(dim=-1)
+
+                index_list.append(index)
+                metric_list.append(total_loss)
+
+        return torch.hstack(index_list), torch.hstack(metric_list)
