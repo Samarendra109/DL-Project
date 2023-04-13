@@ -5,8 +5,8 @@ import torchvision.transforms as transforms
 import torch.optim as optim
 from vog import VoGMetric
 from el2n import EL2NMetric
-# from models import BasicBlock, ResNet
-from torchvision.models import resnet18, ResNet18_Weights
+from models import BasicBlock, ResNet
+# from torchvision.models import resnet18, ResNet18_Weights
 from data_utils import get_subset_random_sampler, get_subset
 import argparse
 from torch.optim.lr_scheduler import MultiStepLR
@@ -14,19 +14,22 @@ import pickle
 import os
 import copy
 
-def test(model, testloader, device):
+def test(model, testloader, criterion, device):
     correct = 0
     total = 0
     model.eval()
+    running_loss = 0.0
     with torch.no_grad():
         for data in testloader:
             images, labels = data
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
+            loss = criterion(outputs, labels)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-    return 100 * (1 - correct / total)
+            running_loss += loss.item()
+    return 100 * (1 - correct / total), running_loss
 
 def main():
     parser = argparse.ArgumentParser()
@@ -39,8 +42,8 @@ def main():
     parser.add_argument('--num_models', type=int, help='number of models for EL2N metric', default = 10)
     args = parser.parse_args()
     
-    # transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    transform = ResNet18_Weights.DEFAULT.transforms()
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    # transform = ResNet18_Weights.DEFAULT.transforms()
     batch_size = args.batch_size
 
     if args.dataset == 'cifar10':
@@ -61,6 +64,7 @@ def main():
     metrics_filename = f'./results/metrics_{args.dataset}_{args.metric}.pkl'
     if not os.path.exists(metrics_filename):
         model = ResNet(BasicBlock, [2, 2, 2, 2], temp=1.0, num_classes=len(classes))
+        # model = resnet18(progress=False)
         if args.metric == 'vog':
             metric = VoGMetric(model, device=device)
             metric_train_args = {'epochs':args.probe_epochs, 'checkpoint_interval':args.checkpoint_interval}
@@ -78,16 +82,21 @@ def main():
             indices, metrics = pickle.load(f)
     
     for frac in frac_list:
+        results_filename = f'./results/errors_{args.dataset}_{args.metric}_{frac}.pkl'
+        if os.path.exists(results_filename):
+            continue
         # sampler = get_subset_random_sampler(indices, metrics, frac/100)
         train_subset = get_subset(indices, metrics, trainset, frac/100)
         frac_trainloader = torch.utils.data.DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=2)
-        # model = ResNet(BasicBlock, [2, 2, 2, 2], temp=1.0, num_classes=len(classes))
-        model = resnet18(progress=False)
+        model = ResNet(BasicBlock, [2, 2, 2, 2], temp=1.0, num_classes=len(classes))
+        # model = resnet18(progress=False)
         model.to(device)
         optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005, nesterov=True)
         criterion = nn.CrossEntropyLoss()
         scheduler = MultiStepLR(optimizer, milestones=[60,120,160], gamma=0.2)
         test_errors = {}
+        training_losses = {}
+        test_losses = {}
         for epoch in range(args.epochs):
             running_loss = 0.0
             for i, data in enumerate(frac_trainloader, 0):
@@ -103,12 +112,14 @@ def main():
 
                 running_loss += loss.item()
 
-            test_error = test(model, testloader, device)
+            test_error, test_loss = test(model, testloader, criterion, device)
             test_errors[epoch] = test_error
-            print(f"Epoch: {epoch + 1}, Loss: {running_loss / len(frac_trainloader)}, Test Error: {test_error:.2f}%")
+            test_losses[epoch] = test_loss / len(testloader)
+            training_losses[epoch] = running_loss / len(frac_trainloader)
+            print(f"Epoch: {epoch + 1}, Training Loss: {training_losses[epoch]}, Test Loss: {test_losses[epoch]}, Test Error: {test_error:.2f}%")
             scheduler.step()
-        with open(f'./results/errors_{args.dataset}_{args.metric}_{frac}.pkl', 'wb') as f:
-            pickle.dump(test_errors, f)
+        with open(results_filename, 'wb') as f:
+            pickle.dump((test_errors, test_losses, training_losses), f)
         print(f"Finished training with frac {frac / 100:.2f}, Test Errors: {test_errors}")
         del model
         
