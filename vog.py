@@ -3,18 +3,20 @@ from torch import nn, optim
 import copy
 from torch.utils.data import Dataset, DataLoader
 from data_utils import IndexDataset
+from torch.optim.lr_scheduler import MultiStepLR
+from tqdm import tqdm
 
 class VoGMetric:
-    def __init__(self, model: nn.Module, num_checkpoints: int, device: torch.device):
+    def __init__(self, model: nn.Module, device: torch.device):
         self.base_model = copy.deepcopy(model)
         self.checkpoints = []
-        self.num_checkpoints = num_checkpoints
         self.device = device
         self.base_model.to(self.device)
         self.criterion = nn.CrossEntropyLoss()
 
     def train(self, train_loader: DataLoader, epochs: int, checkpoint_interval: int):
-        optimizer = optim.SGD(self.base_model.parameters(), lr=0.001, momentum=0.9)
+        optimizer = optim.SGD(self.base_model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005, nesterov=True)
+        scheduler = MultiStepLR(optimizer, milestones=[60,120,160], gamma=0.2)
         for epoch in range(epochs):
             running_loss = 0.0
             for i, data in enumerate(train_loader, 0):
@@ -23,7 +25,7 @@ class VoGMetric:
 
                 optimizer.zero_grad()
 
-                outputs = self.base_model(inputs)
+                outputs = self.base_model(inputs, train=True)
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -31,7 +33,7 @@ class VoGMetric:
                 running_loss += loss.item()
 
             print(f"Epoch {epoch + 1}, Loss: {running_loss / len(train_loader)}")
-
+            scheduler.step()
             if (epoch + 1) % checkpoint_interval == 0:
                 checkpoint = copy.deepcopy(self.base_model)
                 self.checkpoints.append(checkpoint)
@@ -45,14 +47,14 @@ class VoGMetric:
         dataset = IndexDataset(dataset)
 
         data_loader = DataLoader(
-            dataset, batch_size=256, shuffle=False, num_workers=2
+            dataset, batch_size=1, shuffle=False, num_workers=2
         )
 
         for model in self.checkpoints:
             model.eval()
 
         # with torch.no_grad():
-        for index, data in data_loader:
+        for index, data in tqdm(data_loader):
             inputs, labels = data
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
