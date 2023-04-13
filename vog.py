@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from data_utils import IndexDataset
 from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
+import numpy as np
 
 class VoGMetric:
     def __init__(self, model: nn.Module, device: torch.device):
@@ -47,7 +48,7 @@ class VoGMetric:
         dataset = IndexDataset(dataset)
 
         data_loader = DataLoader(
-            dataset, batch_size=1, shuffle=False, num_workers=2
+            dataset, batch_size=128, shuffle=False, num_workers=2
         )
 
         for model in self.checkpoints:
@@ -63,12 +64,12 @@ class VoGMetric:
             gradients = []
             for model in self.checkpoints:
                 outputs = model(inputs)
-                pre_softmax_grads = torch.autograd.grad(outputs.sum(), inputs, create_graph=True)[0]
+                pre_softmax_grads = torch.autograd.grad(outputs.sum(), inputs, create_graph=True)[0].detach().cpu()
                 gradients.append(pre_softmax_grads)
             inputs.requires_grad_(False)
             mean_gradient = sum(gradients) / len(gradients)
             mean_gradient = mean_gradient.mean(dim=1, keepdim=True)  # Averaging over color channels
-            pixelwise_var = torch.sqrt(sum([(g.mean(dim=1, keepdim=True) - mean_gradient)**2 for g in gradients]) / len(gradients))
+            pixelwise_var = np.sqrt(sum([(g.mean(dim=1, keepdim=True) - mean_gradient)**2 for g in gradients]) / len(gradients))
             vog = pixelwise_var.mean(dim=(-1, -2)).squeeze()
 
             index_list.append(index)
