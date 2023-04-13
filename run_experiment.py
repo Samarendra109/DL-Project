@@ -1,13 +1,16 @@
 import torch
+import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 import torch.optim as optim
 from vog import VoGMetric
 from el2n import EL2NMetric
 from models import BasicBlock, ResNet
-from data_utils import get_subset_random_sampler
+from data_utils import get_subset_random_sampler, get_subset
 import argparse
 from torch.optim.lr_scheduler import MultiStepLR
+import pickle
+
 
 def test(model, testloader, device):
     correct = 0
@@ -63,8 +66,9 @@ def main():
         pickle.dump((indices, metrics), f)
     
     for frac in frac_list:
-        sampler = get_subset_random_sampler(indices, metrics, frac/100)
-        frac_trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=False, num_workers=2, sampler=sampler)
+        # sampler = get_subset_random_sampler(indices, metrics, frac/100)
+        train_subset = get_subset(indices, metrics, trainset, frac/100)
+        frac_trainloader = torch.utils.data.DataLoader(train_subset, batch_size=batch_size, shuffle=False, num_workers=2)
         model = ResNet(BasicBlock, [2, 2, 2, 2], temp=1.0, num_classes=len(classes))
         model.to(device)
         optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005, nesterov=True)
@@ -73,12 +77,11 @@ def main():
         test_errors = {}
         for epoch in range(args.epochs):
             running_loss = 0.0
-            for i, data in enumerate(frac_trainloader, 0):
+            for data in frac_trainloader:
                 inputs, labels = data
                 inputs, labels = inputs.to(device), labels.to(device)
 
                 optimizer.zero_grad()
-
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 loss.backward()
@@ -93,6 +96,8 @@ def main():
         with open(f'./results_errors_{args.dataset}_{args.metric}_{frac}.pkl', 'wb') as f:
             pickle.dump(test_errors, f)
         print(f"Finished training with frac {frac / 100:.2f}, Test Errors: {test_errors}")
+        del model
+        
         
 if __name__ == '__main__':
     main()
