@@ -1,6 +1,6 @@
 import torch
 from typing import Tuple, Any
-from torch.utils.data import Dataset, SubsetRandomSampler
+from torch.utils.data import Dataset, SubsetRandomSampler, Subset
 
 
 class IndexDataset(Dataset):
@@ -32,3 +32,18 @@ def get_subset_random_sampler(
     k = int(len(indices)*alpha)
     pruned_indices = indices[torch.topk(metrics, k).indices]
     return SubsetRandomSampler(pruned_indices)
+
+def get_subset(
+    indices: torch.LongTensor, 
+    metrics: torch.FloatTensor,
+    trainset: Dataset,
+    alpha: float 
+) -> Dataset:
+    """
+    Used for pruning the dataset based on the metric passed.
+    alpha denotes the percentage of the data to keep
+    """
+    indices, metrics = indices.cpu(), metrics.cpu()
+    k = int(len(indices)*alpha)
+    pruned_indices = indices[torch.topk(metrics, k).indices]
+    return Subset(trainset, pruned_indices)

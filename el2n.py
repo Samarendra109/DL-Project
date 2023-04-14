@@ -4,6 +4,7 @@ import copy
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from data_utils import IndexDataset
+from torch.optim.lr_scheduler import MultiStepLR
 
 
 class EL2NMetric:
@@ -22,7 +23,7 @@ class EL2NMetric:
 
     def get_optimizer(self):
         # Hardcoding the optimizer (Can extend the class to overwrite it)
-        return optim.SGD(self.model_list.parameters(), lr=0.001, momentum=0.9)
+        return optim.SGD(self.model_list.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005, nesterov=True)
 
     def train_step(self, train_loader: DataLoader):
 
@@ -44,10 +45,11 @@ class EL2NMetric:
             self.optimizer.step()
 
     def train(self, train_loader: DataLoader, epochs: int):
-
+        scheduler = MultiStepLR(self.optimizer, milestones=[60,120, 160], gamma=0.2)
         for i in range(epochs):
             print(f"Epoch {i}\n")
             self.train_step(train_loader)
+            scheduler.step()
 
     def get_metric(self, dataset: Dataset):
 
