@@ -4,7 +4,7 @@ import copy
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from data_utils import IndexDataset
-
+import torch.nn.functional as F
 from models import ResNet
 from clustering import KNN
 
@@ -122,8 +122,8 @@ class PredictionDepth:
             self.optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = model(inputs)
-            loss = self.training_criterion(outputs, labels)
+            outputs = self.model(inputs)
+            loss = self.training_criterion(outputs[-1], labels)
             loss.backward()
             self.optimizer.step()
 
