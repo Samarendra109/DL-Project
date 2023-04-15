@@ -10,95 +10,13 @@ from clustering import KNN
 
 
 class ResNetForPredictionDepth(ResNet):
-    def forward(self, x, k=-1, train=True):
-        """
-        :param x:
-        :param k:
-        :param train: switch model to test and extract the FMs of the kth layer
-        :return:
-
-        If k=-1 return all the layers
-        """
-        i = 0
-        out = self.bn1(self.conv1(x))
-        layer_outputs = []
-        if k == i and not (train):
-            return None, out.view(out.shape[0], -1)
-        elif k == -1 and not (train):
-            layer_outputs.append(torch.clone(out.view(out.shape[0], -1)))
-        out = F.relu(out)
-        i += 1
-        for module in self.layer1:
-            if not (train):
-                _, out = module(
-                    out, train=False
-                )  # take the output of ResBlock before relu
-                if k == i:
-                    return None, out.view(out.shape[0], -1)
-                elif k == -1:
-                    layer_outputs.append(torch.clone(out.view(out.shape[0], -1)))
-            else:
-                out = module(out)
-            out = F.relu(out)
-            i += 1
-
-        for module in self.layer2:
-            if not (train):
-                _, out = module(
-                    out, train=False
-                )  # take the output of ResBlock before relu
-                if k == i:
-                    return None, out.view(out.shape[0], -1)
-                elif k == -1:
-                    layer_outputs.append(torch.clone(out.view(out.shape[0], -1)))
-            else:
-                out = module(out)
-            out = F.relu(out)
-            i += 1
-        for module in self.layer3:
-            if not (train):
-                _, out = module(
-                    out, train=False
-                )  # take the output of ResBlock before relu
-                if k == i:
-                    return None, out.view(out.shape[0], -1)
-                elif k == -1:
-                    layer_outputs.append(torch.clone(out.view(out.shape[0], -1)))
-            else:
-                out = module(out)
-            out = F.relu(out)
-            i += 1
-        for module in self.layer4:
-            if not (train):
-                _, out = module(
-                    out, train=False
-                )  # take the output of ResBlock before relu
-                if k == i:
-                    return None, out.view(out.shape[0], -1)
-                elif k == -1:
-                    layer_outputs.append(torch.clone(out.view(out.shape[0], -1)))
-            else:
-                out = module(out)
-            out = F.relu(out)
-            i += 1
-        out = F.avg_pool2d(out, 4)
-        out = out.view(out.size(0), -1)
-        out = self.fc(out) / self.temp
-        if not (train):
-            _f = F.softmax(out, 1)  # take the output of softmax
-            if k == i:
-                return None, _f
-            elif k == -1:
-                layer_outputs.append(torch.clone(_f))
-
-        if k == -1:
-            return layer_outputs
-        else:
-            return out
+    pass
 
 
 class PredictionDepth:
-    def __init__(self, model: ResNetForPredictionDepth, device: torch.device, k=10):
+    def __init__(
+        self, model: ResNetForPredictionDepth, device: torch.device, k=30, layers=5
+    ):
 
         self.model = model.to(device)
         self.device = device
@@ -106,6 +24,7 @@ class PredictionDepth:
         # Assuming during training different loss is used
         self.training_criterion = nn.CrossEntropyLoss()
         self.k = k
+        self.layers = layers
 
     def get_optimizer(self):
         # Hardcoding the optimizer (Can extend the class to overwrite it)
@@ -123,7 +42,7 @@ class PredictionDepth:
 
             # forward + backward + optimize
             outputs = self.model(inputs)
-            loss = self.training_criterion(outputs[-1], labels)
+            loss = self.training_criterion(outputs, labels)
             loss.backward()
             self.optimizer.step()
 
@@ -144,49 +63,60 @@ class PredictionDepth:
             dataset, batch_size=256, shuffle=False, num_workers=2  # Hardcoding for now
         )
 
-        layer_outputs = []
-        labels_list = []
-        knn_models = []
-
         with torch.no_grad():
 
-            for index, data in data_loader:
-                # get the inputs; data is a list of [inputs, labels]
-                inputs, labels = data
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+            final_metric_list = []
+            starting_layer_index = 0
 
-                # store the layer outputs
-                layer_outputs_for_batch = model(inputs, k=-1, train=False)
+            for layer_index in range(starting_layer_index, self.model.get_num_layers()):
 
-                if len(layer_outputs) == 0:
-                    for layer_output in layer_outputs_for_batch:
-                        layer_outputs.append([layer_output])
-                        labels_list.append([labels])
-                else:
-                    for layer_index, layer_output in enumerate(layer_outputs_for_batch):
-                        layer_outputs[i].append(layer_output)
-                        labels_list[i].append(labels)
+                x, y = None, None
 
-            for layer_output, labels in zip(layer_outputs, labels_list):
-                x = torch.stack(layer_output)
-                y = torch.stach(labels)
-                knn_models.append(KNN(x, y, k=self.k))
+                for index, data in tqdm(data_loader):
+                    # get the inputs; data is a list of [inputs, labels]
+                    inputs, labels = data
+                    inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            for index, data in data_loader:
-                # get the inputs; data is a list of [inputs, labels]
-                inputs, labels = data
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                    _, layer_output = self.model(inputs, layer_index, train=False)
 
-                final_metric = torch.ones(inputs.size(0)) * len(knn_models)
-                prev_output = labels
+                    if layer_index == starting_layer_index:
+                        final_metric = (
+                            torch.ones(inputs.size(0)) * self.model.get_num_layers()
+                        )
+                        final_metric = final_metric.to(self.device)
+                        # print(len(final_metric_list))
+                        final_metric_list.append(final_metric)
 
-                for i, knn_model in enumerate(knn_models):
-                    knn_output = knn_model.predict(inputs)
-                    mask = (knn_output == labels) & (knn_output != prev_output)
-                    prev_output = knn_output
-                    final_metric.masked_fill_(mask, i)
+                    if x == None:
+                        x = layer_output
+                        y = labels
+                    else:
+                        x = torch.vstack((x, layer_output))
+                        y = torch.hstack((y, labels))
 
-                index_list.append(index)
-                metric_list.append(final_metric)
+                knn_model = KNN(x, y, k=self.k)
 
-        return torch.hstack(index_list), torch.hstack(metric_list)
+                curr_output = []
+
+                for t_i, (index, data) in tqdm(enumerate(data_loader)):
+                    # get the inputs; data is a list of [inputs, labels]
+                    inputs, labels = data
+                    inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+                    _, layer_output = self.model(inputs, layer_index, train=False)
+                    knn_output = knn_model.predict(layer_output)
+                    if layer_index == starting_layer_index:
+                        mask = knn_output == labels
+                    else:
+                        mask = (knn_output == labels) & (knn_output != prev_output[t_i])
+
+                    curr_output.append(knn_output)
+
+                    final_metric_list[t_i].masked_fill_(mask, layer_index)
+
+                    if layer_index == self.model.get_num_layers() - 1:
+                        index_list.append(index)
+
+                prev_output = curr_output
+
+            return torch.hstack(index_list), torch.hstack(final_metric_list)
