@@ -12,24 +12,32 @@ def randomize_tensor(tensor):
     return tensor[th.randperm(len(tensor))]
 
 
-def distance_matrix(x, y=None, p=2):  # pairwise distance of vectors
+def distance_matrix(x1, y=None, p=2):  # pairwise distance of vectors
 
-    y = x if type(y) == type(None) else y
+    dist_list = []
+    for x in x1:
 
-    n = x.size(0)
-    m = y.size(0)
-    d = x.size(1)
+        x = x.unsqueeze(0)
+        y = x if type(y) == type(None) else y
+        # import pdb; pdb.set_trace()
 
-    x = x.unsqueeze(1).expand(n, m, d)
-    y = y.unsqueeze(0).expand(n, m, d)
+        n = x.size(0)
+        m = y.size(0)
+        d = x.size(1)
 
-    dist = (
-        th.linalg.vector_norm(x - y, p, 2)
-        if th.__version__ >= "1.7.0"
-        else th.pow(x - y, p).sum(2) ** (1 / p)
-    )
+        x = x.unsqueeze(1).expand(n, m, d)
+        y1 = y.unsqueeze(0).expand(n, m, d)
 
-    return dist
+        dist = (
+            th.linalg.vector_norm(x - y1, p, 2)
+            if th.__version__ >= "1.7.0"
+            else th.pow(x - y1, p).sum(2) ** (1 / p)
+        )
+        # import pdb; pdb.set_trace()
+
+        dist_list.append(dist)
+
+    return th.vstack(dist_list)
 
 
 class NN:
