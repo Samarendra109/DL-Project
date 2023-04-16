@@ -78,7 +78,7 @@ class EL2NMetric:
                 # calculate the metric
                 total_loss = None
                 for i, model in enumerate(self.model_list):
-                    outputs = model(inputs)
+                    outputs = torch.nn.functional.softmax(model(inputs), dim=-1)
 
                     if i == 0:
                         labels = torch.nn.functional.one_hot(
