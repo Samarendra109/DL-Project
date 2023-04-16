@@ -23,7 +23,13 @@ class EL2NMetric:
 
     def get_optimizer(self):
         # Hardcoding the optimizer (Can extend the class to overwrite it)
-        return optim.SGD(self.model_list.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005, nesterov=True)
+        return optim.SGD(
+            self.model_list.parameters(),
+            lr=0.1,
+            momentum=0.9,
+            weight_decay=0.0005,
+            nesterov=True,
+        )
 
     def train_step(self, train_loader: DataLoader):
 
@@ -45,7 +51,7 @@ class EL2NMetric:
             self.optimizer.step()
 
     def train(self, train_loader: DataLoader, epochs: int):
-        scheduler = MultiStepLR(self.optimizer, milestones=[60,120, 160], gamma=0.2)
+        scheduler = MultiStepLR(self.optimizer, milestones=[60, 120, 160], gamma=0.2)
         for i in range(epochs):
             print(f"Epoch {i}\n")
             self.train_step(train_loader)
@@ -72,7 +78,7 @@ class EL2NMetric:
                 # calculate the metric
                 total_loss = None
                 for i, model in enumerate(self.model_list):
-                    outputs = model(inputs)
+                    outputs = torch.nn.functional.softmax(model(inputs), dim=-1)
 
                     if i == 0:
                         labels = torch.nn.functional.one_hot(

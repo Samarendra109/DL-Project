@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 import numpy as np
 
+
 class VoGMetric:
     def __init__(self, model: nn.Module, device: torch.device):
         self.base_model = copy.deepcopy(model)
@@ -16,8 +17,14 @@ class VoGMetric:
         self.criterion = nn.CrossEntropyLoss()
 
     def train(self, train_loader: DataLoader, epochs: int, checkpoint_interval: int):
-        optimizer = optim.SGD(self.base_model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005, nesterov=True)
-        scheduler = MultiStepLR(optimizer, milestones=[60,120,160], gamma=0.2)
+        optimizer = optim.SGD(
+            self.base_model.parameters(),
+            lr=0.1,
+            momentum=0.9,
+            weight_decay=0.0005,
+            nesterov=True,
+        )
+        scheduler = MultiStepLR(optimizer, milestones=[60, 120, 160], gamma=0.2)
         for epoch in range(epochs):
             running_loss = 0.0
             for i, data in enumerate(train_loader, 0):
@@ -47,9 +54,7 @@ class VoGMetric:
 
         dataset = IndexDataset(dataset)
 
-        data_loader = DataLoader(
-            dataset, batch_size=128, shuffle=False, num_workers=2
-        )
+        data_loader = DataLoader(dataset, batch_size=128, shuffle=False, num_workers=2)
 
         for model in self.checkpoints:
             model.eval()
@@ -64,12 +69,26 @@ class VoGMetric:
             gradients = []
             for model in self.checkpoints:
                 outputs = model(inputs)
-                pre_softmax_grads = torch.autograd.grad(outputs.sum(), inputs, create_graph=True)[0].detach().cpu()
+                pre_softmax_grads = (
+                    torch.autograd.grad(outputs.sum(), inputs, create_graph=True)[0]
+                    .detach()
+                    .cpu()
+                )
                 gradients.append(pre_softmax_grads)
             inputs.requires_grad_(False)
             mean_gradient = sum(gradients) / len(gradients)
-            mean_gradient = mean_gradient.mean(dim=1, keepdim=True)  # Averaging over color channels
-            pixelwise_var = np.sqrt(sum([(g.mean(dim=1, keepdim=True) - mean_gradient)**2 for g in gradients]) / len(gradients))
+            mean_gradient = mean_gradient.mean(
+                dim=1, keepdim=True
+            )  # Averaging over color channels
+            pixelwise_var = np.sqrt(
+                sum(
+                    [
+                        (g.mean(dim=1, keepdim=True) - mean_gradient) ** 2
+                        for g in gradients
+                    ]
+                )
+                / len(gradients)
+            )
             vog = pixelwise_var.mean(dim=(-1, -2)).squeeze()
 
             index_list.append(index)
