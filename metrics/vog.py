@@ -6,47 +6,41 @@ from data_utils import IndexDataset
 from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 import numpy as np
+from .base_metric import BaseMetric
 
 
-class VoGMetric:
-    def __init__(self, model: nn.Module, device: torch.device):
-        self.base_model = copy.deepcopy(model)
+class VoGMetric(BaseMetric):
+    def __init__(
+        self, model: nn.Module, device: torch.device, checkpoint_interval: int
+    ):
+        self.model = copy.deepcopy(model)
         self.checkpoints = []
         self.device = device
-        self.base_model.to(self.device)
+        self.model.to(self.device)
+        self.optimizer = self.get_optimizer()
         self.criterion = nn.CrossEntropyLoss()
+        self.checkpoint_interval = checkpoint_interval
 
-    def train(self, train_loader: DataLoader, epochs: int, checkpoint_interval: int):
-        optimizer = optim.SGD(
-            self.base_model.parameters(),
-            lr=0.1,
-            momentum=0.9,
-            weight_decay=0.0005,
-            nesterov=True,
-        )
-        scheduler = MultiStepLR(optimizer, milestones=[60, 120, 160], gamma=0.2)
-        for epoch in range(epochs):
-            running_loss = 0.0
-            for i, data in enumerate(train_loader, 0):
-                inputs, labels = data
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+    def train_step(self, train_loader: DataLoader, epoch: int):
 
-                optimizer.zero_grad()
+        running_loss = 0.0
+        for i, data in enumerate(train_loader, 0):
+            inputs, labels = data
+            inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-                outputs = self.base_model(inputs, train=True)
-                loss = self.criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
+            self.optimizer.zero_grad()
 
-                running_loss += loss.item()
+            outputs = self.model(inputs, train=True)
+            loss = self.criterion(outputs, labels)
+            loss.backward()
+            self.optimizer.step()
 
-            print(f"Epoch {epoch + 1}, Loss: {running_loss / len(train_loader)}")
-            scheduler.step()
-            if (epoch + 1) % checkpoint_interval == 0:
-                checkpoint = copy.deepcopy(self.base_model)
-                self.checkpoints.append(checkpoint)
+            running_loss += loss.item()
 
-        print("Finished training")
+        print(f"Epoch {epoch + 1}, Loss: {running_loss / len(train_loader)}")
+        if (epoch + 1) % self.checkpoint_interval == 0:
+            checkpoint = copy.deepcopy(self.model)
+            self.checkpoints.append(checkpoint)
 
     def get_metric(self, dataset: Dataset):
         index_list = []

@@ -73,11 +73,12 @@ def main():
         default=1.0,
     )
     parser.add_argument(
-        "--rng_seed", type=int, help="seed for torch random number generation", default=42
+        "--rng_seed",
+        type=int,
+        help="seed for torch random number generation",
+        default=42,
     )
-    parser.add_argument(
-        "--gpu_n", type=int, help="which gpu to use", default=0
-    )
+    parser.add_argument("--gpu_n", type=int, help="which gpu to use", default=0)
     args = parser.parse_args()
     torch.manual_seed(args.rng_seed)
 
@@ -116,7 +117,7 @@ def main():
         )
         classes = list(range(10))
         frac_list = [100, 60, 36, 22, 13, 8, 5, 3, 2, 1]
-    
+
     full_dataset_size = len(full_trainset)
     dataset_size = int(full_dataset_size * args.initial_dataset_size)
     initial_dataset_indices = torch.randperm(full_dataset_size)[:dataset_size]
@@ -176,26 +177,31 @@ def main():
 
         for epoch in range(args.epochs):
             running_loss = 0.0
-            for i, data in enumerate(frac_trainloader, 0):
-                inputs, labels = data
-                inputs, labels = inputs.to(device), labels.to(device)
+            example_count = 0
+            while example_count < full_dataset_size:
+                for i, data in enumerate(frac_trainloader, 0):
+                    inputs, labels = data
+                    inputs, labels = inputs.to(device), labels.to(device)
 
-                optimizer.zero_grad()
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
-                optimizer.step()
+                    optimizer.zero_grad()
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+                    optimizer.step()
 
-                running_loss += loss.item()
-
-            test_error, test_loss = test(model, testloader, criterion, device)
-            test_errors[epoch] = test_error
-            test_losses[epoch] = test_loss / len(testloader)
-            training_losses[epoch] = running_loss / len(frac_trainloader)
-            print(
-                f"Epoch: {epoch + 1}, Training Loss: {training_losses[epoch]}, Test Loss: {test_losses[epoch]}, Test Error: {test_error:.2f}%"
-            )
+                    running_loss += loss.item()
+                    example_count += inputs.size(0)
+            training_losses[epoch] = running_loss / example_count
+            if (epoch + 1) % 10 == 0 or epoch + 1 == args.epochs:
+                test_error, test_loss = test(model, testloader, criterion, device)
+                test_errors[epoch] = test_error
+                test_losses[epoch] = test_loss / len(testloader)
+                print(
+                    f"Epoch: {epoch + 1}, Training Loss: {training_losses[epoch]}, Test Loss: {test_losses[epoch]}, Test Error: {test_error:.2f}%"
+                )
+            else:
+                print(f"Epoch: {epoch + 1}, Training Loss: {training_losses[epoch]}")
             scheduler.step()
         with open(results_filename, "wb") as f:
             pickle.dump((test_errors, test_losses, training_losses), f)

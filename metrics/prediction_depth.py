@@ -8,16 +8,11 @@ import torch.nn.functional as F
 from models import ResNet
 from clustering import KNN
 from torch.optim.lr_scheduler import MultiStepLR
+from .base_metric import BaseMetric
 
 
-class ResNetForPredictionDepth(ResNet):
-    pass
-
-
-class PredictionDepth:
-    def __init__(
-        self, model: ResNetForPredictionDepth, device: torch.device, k=30, layers=5
-    ):
+class PredictionDepth(BaseMetric):
+    def __init__(self, model: ResNet, device: torch.device, k=30, layers=5):
 
         self.model = model.to(device)
         self.device = device
@@ -27,17 +22,7 @@ class PredictionDepth:
         self.k = k
         self.layers = layers
 
-    def get_optimizer(self):
-        # Hardcoding the optimizer (Can extend the class to overwrite it)
-        return optim.SGD(
-            self.model.parameters(),
-            lr=0.1,
-            momentum=0.9,
-            weight_decay=0.0005,
-            nesterov=True,
-        )
-
-    def train_step(self, train_loader: DataLoader):
+    def train_step(self, train_loader: DataLoader, epoch: int):
 
         for data in tqdm(train_loader):
             # get the inputs; data is a list of [inputs, labels]
@@ -53,13 +38,6 @@ class PredictionDepth:
             loss.backward()
             self.optimizer.step()
 
-    def train(self, train_loader: DataLoader, epochs: int):
-        scheduler = MultiStepLR(self.optimizer, milestones=[60, 120, 160], gamma=0.2)
-        for i in range(epochs):
-            print(f"Epoch {i}\n")
-            self.train_step(train_loader)
-            scheduler.step()
-
     def get_metric(self, dataset: Dataset):
 
         index_list = []
@@ -71,10 +49,13 @@ class PredictionDepth:
             dataset, batch_size=256, shuffle=False, num_workers=2  # Hardcoding for now
         )
 
+        self.model.eval()
+
         with torch.no_grad():
 
             final_metric_list = []
             starting_layer_index = 0
+            self.model.eval()
 
             for layer_index in range(starting_layer_index, self.model.get_num_layers()):
 
