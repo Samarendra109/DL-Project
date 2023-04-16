@@ -3,8 +3,7 @@ import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 import torch.optim as optim
-from vog import VoGMetric
-from el2n import EL2NMetric
+from metrics import VoGMetric, EL2NMetric
 from models import BasicBlock, ResNet
 from torch.utils.data import Subset
 
@@ -136,16 +135,11 @@ def main():
         model = ResNet(BasicBlock, [2, 2, 2, 2], temp=1.0, num_classes=len(classes))
         # model = resnet18(progress=False)
         if args.metric == "vog":
-            metric = VoGMetric(model, device=device)
-            metric_train_args = {
-                "epochs": args.probe_epochs,
-                "checkpoint_interval": args.checkpoint_interval,
-            }
+            metric = VoGMetric(model, device=device, checkpoint_interval=args.checkpoint_interval)
         elif args.metric == "el2n":
             metric = EL2NMetric(model, args.num_models, device)
-            metric_train_args = {"epochs": args.probe_epochs}
 
-        metric.train(trainloader, **metric_train_args)
+        metric.train(trainloader, epochs=args.probe_epochs)
         indices, metrics = metric.get_metric(trainset)
         with open(metrics_filename, "wb") as f:
             pickle.dump((indices, metrics), f)
