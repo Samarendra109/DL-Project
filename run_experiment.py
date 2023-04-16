@@ -170,6 +170,7 @@ def main():
         test_losses = {}
 
         for epoch in range(args.epochs):
+            model.train()
             running_loss = 0.0
             example_count = 0
             while example_count < full_dataset_size:
@@ -181,7 +182,7 @@ def main():
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+                    # torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
                     optimizer.step()
 
                     running_loss += loss.item()

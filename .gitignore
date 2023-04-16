@@ -1,0 +1,7 @@
+results
+metrics/.ipynb_checkpoints/
+metrics/__pycache__/
+.ipynb_checkpoints/
+__pycache__/
+cifar_net.pth
+data/

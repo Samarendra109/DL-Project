@@ -54,8 +54,7 @@ class PredictionDepth(BaseMetric):
         with torch.no_grad():
 
             final_metric_list = []
-            starting_layer_index = 0
-            self.model.eval()
+            starting_layer_index = self.model.get_num_layers() - self.layers
 
             for layer_index in range(starting_layer_index, self.model.get_num_layers()):
 
@@ -94,10 +93,18 @@ class PredictionDepth(BaseMetric):
 
                     _, layer_output = self.model(inputs, layer_index, train=False)
                     knn_output = knn_model.predict(layer_output)
+
+                    # If current output is not labels then reset it to being hardest
+                    final_metric_list[t_i].masked_fill_(
+                        knn_output != labels, self.model.get_num_layers()
+                    )
+
+                    # If current output is equals to labels
+                    #  then only update if the previous output was not equal to labels
                     if layer_index == starting_layer_index:
                         mask = knn_output == labels
                     else:
-                        mask = (knn_output == labels) & (knn_output != prev_output[t_i])
+                        mask = (knn_output == labels) & (prev_output[t_i] != labels)
 
                     curr_output.append(knn_output)
 
