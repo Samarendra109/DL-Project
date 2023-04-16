@@ -170,6 +170,7 @@ def main():
         test_losses = {}
 
         for epoch in range(args.epochs):
+            model.train()
             running_loss = 0.0
             example_count = 0
             while example_count < full_dataset_size:
