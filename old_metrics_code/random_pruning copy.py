@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 class RandomPruningMetric:
     def __init__(self, device: torch.device):
-        self.device = device        
+        self.device = device
 
     def train_step(self, train_loader: DataLoader):
         pass

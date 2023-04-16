@@ -78,6 +78,10 @@ class ResNet(nn.Module):
         :return:
         """
         i = 0
+        if k == i and not (train):
+            return None, torch.clone(x.view(x.shape[0], -1))
+        i += 1
+
         out = self.bn1(self.conv1(x))
         if k == i and not (train):
             return None, out.view(out.shape[0], -1)
