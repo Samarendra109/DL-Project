@@ -6,6 +6,7 @@ import torch.optim as optim
 from vog import VoGMetric
 from el2n import EL2NMetric
 from models import BasicBlock, ResNet
+from torch.utils.data import Subset
 
 # from torchvision.models import resnet18, ResNet18_Weights
 from data_utils import get_subset_random_sampler, get_subset
@@ -65,7 +66,17 @@ def main():
     parser.add_argument(
         "--num_models", type=int, help="number of models for EL2N metric", default=10
     )
+    parser.add_argument(
+        "--initial_dataset_size",
+        type=float,
+        help="fraction of the total dataset to keep (between 0 and 1)",
+        default=1.0,
+    )
+    parser.add_argument(
+        "--rng_seed", type=int, help="seed for torch random number generation", default=42
+    )
     args = parser.parse_args()
+    torch.manual_seed(args.rng_seed)
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
@@ -74,7 +85,7 @@ def main():
     batch_size = args.batch_size
 
     if args.dataset == "cifar10":
-        trainset = torchvision.datasets.CIFAR10(
+        full_trainset = torchvision.datasets.CIFAR10(
             root="./data/cifar10", train=True, download=True, transform=transform
         )
         testset = torchvision.datasets.CIFAR10(
@@ -94,7 +105,7 @@ def main():
         )
         frac_list = list(range(100, 10, -10))
     elif args.dataset == "svhn":
-        trainset = torchvision.datasets.SVHN(
+        full_trainset = torchvision.datasets.SVHN(
             root="./data/svhn", split="train", download=True, transform=transform
         )
         testset = torchvision.datasets.SVHN(
@@ -102,6 +113,11 @@ def main():
         )
         classes = list(range(10))
         frac_list = [100, 60, 36, 22, 13, 8, 5, 3, 2, 1]
+    
+    full_dataset_size = len(full_trainset)
+    dataset_size = int(full_dataset_size * args.initial_dataset_size)
+    initial_dataset_indices = torch.randperm(full_dataset_size)[:dataset_size]
+    trainset = Subset(full_trainset, initial_dataset_indices)
 
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=True, num_workers=2
@@ -111,7 +127,7 @@ def main():
     )
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    metrics_filename = f"./results/metrics_{args.dataset}_{args.metric}.pkl"
+    metrics_filename = f"./results/metrics_{args.dataset}_{args.metric}_{args.initial_dataset_size}.pkl"
     if not os.path.exists(metrics_filename):
         model = ResNet(BasicBlock, [2, 2, 2, 2], temp=1.0, num_classes=len(classes))
         # model = resnet18(progress=False)
@@ -135,7 +151,7 @@ def main():
             indices, metrics = pickle.load(f)
 
     for frac in frac_list:
-        results_filename = f"./results/errors_{args.dataset}_{args.metric}_{frac}.pkl"
+        results_filename = f"./results/errors_{args.dataset}_{args.metric}_{args.initial_dataset_size}_{frac}.pkl"
         if os.path.exists(results_filename):
             continue
         # sampler = get_subset_random_sampler(indices, metrics, frac/100)
@@ -154,6 +170,7 @@ def main():
         test_errors = {}
         training_losses = {}
         test_losses = {}
+
         for epoch in range(args.epochs):
             running_loss = 0.0
             for i, data in enumerate(frac_trainloader, 0):
@@ -179,6 +196,7 @@ def main():
             scheduler.step()
         with open(results_filename, "wb") as f:
             pickle.dump((test_errors, test_losses, training_losses), f)
+
         print(
             f"Finished training with frac {frac / 100:.2f}, Test Errors: {test_errors}"
         )
