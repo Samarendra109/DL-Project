@@ -75,6 +75,9 @@ def main():
     parser.add_argument(
         "--rng_seed", type=int, help="seed for torch random number generation", default=42
     )
+    parser.add_argument(
+        "--gpu_n", type=int, help="which gpu to use", default=0
+    )
     args = parser.parse_args()
     torch.manual_seed(args.rng_seed)
 
@@ -125,7 +128,7 @@ def main():
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=batch_size, shuffle=False, num_workers=2
     )
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{args.gpu_n}" if torch.cuda.is_available() else "cpu")
 
     metrics_filename = f"./results/metrics_{args.dataset}_{args.metric}_{args.initial_dataset_size}.pkl"
     if not os.path.exists(metrics_filename):
