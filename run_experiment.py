@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 import torch.optim as optim
-from metrics import VoGMetric, EL2NMetric
+from metrics import VoGMetric, EL2NMetric, PredictionDepth
 from models import BasicBlock, ResNet
 from torch.utils.data import Subset
 
@@ -39,7 +39,7 @@ def main():
     parser.add_argument(
         "--metric",
         default="vog",
-        choices=["vog", "el2n"],
+        choices=["vog", "el2n", "pd"],
         help="metric to use for data pruning",
     )
     parser.add_argument(
@@ -56,6 +56,12 @@ def main():
         default=200,
     )
     parser.add_argument("--epochs", type=int, help="epochs to train for", default=200)
+    parser.add_argument(
+        "--pd_layers",
+        type=int,
+        help="no. of layers for prediction depth",
+        default=9,
+    )
     parser.add_argument(
         "--checkpoint_interval",
         type=int,
@@ -138,6 +144,8 @@ def main():
             metric = VoGMetric(model, device=device, checkpoint_interval=args.checkpoint_interval)
         elif args.metric == "el2n":
             metric = EL2NMetric(model, args.num_models, device)
+        elif args.metric == "pd":
+            metric = PredictionDepth(model, device=device, layers=args.pd_layers)
 
         metric.train(trainloader, epochs=args.probe_epochs)
         indices, metrics = metric.get_metric(trainset)
