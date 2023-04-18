@@ -12,7 +12,9 @@ from .base_metric import BaseMetric
 
 
 class PredictionDepth(BaseMetric):
-    def __init__(self, model: ResNet, device: torch.device, k=30, layers=5):
+    def __init__(
+        self, model: ResNet, device: torch.device, k=30, layers=5, alpha_to_save=1.0
+    ):
 
         self.model = model.to(device)
         self.device = device
@@ -21,6 +23,8 @@ class PredictionDepth(BaseMetric):
         self.training_criterion = nn.CrossEntropyLoss()
         self.k = k
         self.layers = layers
+        # The percentage of data to save in the KNN model
+        self.alpha_to_save = alpha_to_save
 
     def train_step(self, train_loader: DataLoader, epoch: int):
 
@@ -74,6 +78,12 @@ class PredictionDepth(BaseMetric):
                         final_metric = final_metric.to(self.device)
                         # print(len(final_metric_list))
                         final_metric_list.append(final_metric)
+
+                    indices = torch.randperm(layer_output.size(0))[
+                        : int(self.alpha_to_save * layer_output.size(0))
+                    ]
+                    layer_output = layer_output[indices, :]
+                    labels = labels[indices, :]
 
                     if x == None:
                         x = layer_output
