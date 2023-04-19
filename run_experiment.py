@@ -63,6 +63,12 @@ def main():
         default=9,
     )
     parser.add_argument(
+        "--pd_alpha",
+        type=float,
+        help="alpha for prediction depth",
+        default=1.0,
+    )
+    parser.add_argument(
         "--checkpoint_interval",
         type=int,
         help="checkpoint interval for VoG metric",
@@ -145,7 +151,7 @@ def main():
         elif args.metric == "el2n":
             metric = EL2NMetric(model, args.num_models, device)
         elif args.metric == "pd":
-            metric = PredictionDepth(model, device=device, layers=args.pd_layers)
+            metric = PredictionDepth(model, device=device, layers=args.pd_layers, alpha_to_save=args.pd_alpha)
 
         metric.train(trainloader, epochs=args.probe_epochs)
         indices, metrics = metric.get_metric(trainset)

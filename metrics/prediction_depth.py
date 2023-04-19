@@ -83,7 +83,7 @@ class PredictionDepth(BaseMetric):
                         : int(self.alpha_to_save * layer_output.size(0))
                     ]
                     layer_output = layer_output[indices, :]
-                    labels = labels[indices, :]
+                    labels = labels[indices]
 
                     if x == None:
                         x = layer_output
