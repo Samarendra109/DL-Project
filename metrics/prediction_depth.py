@@ -12,18 +12,30 @@ from .base_metric import BaseMetric
 
 
 class PredictionDepth(BaseMetric):
+    """
+    Implements the prediction depth metric
+    """
+
     def __init__(
         self, model: ResNet, device: torch.device, k=30, layers=5, alpha_to_save=1.0
     ):
 
+        """
+        Args:
+            model: probing model to be trained
+            device: device
+            k: the nearest neighbors size for KNN model
+            layers: If number is l then last l layers is taken.
+            alpha_to_save: the percentage of data to save in the KNN model.
+                (As it is inefficient to store the complete dataset in the KNN models)
+        """
+
         self.model = model.to(device)
         self.device = device
         self.optimizer = self.get_optimizer()
-        # Assuming during training different loss is used
         self.training_criterion = nn.CrossEntropyLoss()
         self.k = k
         self.layers = layers
-        # The percentage of data to save in the KNN model
         self.alpha_to_save = alpha_to_save
 
     def train_step(self, train_loader: DataLoader, epoch: int):
@@ -43,6 +55,9 @@ class PredictionDepth(BaseMetric):
             self.optimizer.step()
 
     def get_metric(self, dataset: Dataset):
+        """
+        returns the prediction depth metric for the dataset.
+        """
 
         index_list = []
         metric_list = []

@@ -9,6 +9,11 @@ from .base_metric import BaseMetric
 
 
 class RandomPruningMetric(BaseMetric):
+    """
+    Implements the random pruning metric.
+    Gives a random score for each datapoint in the metric.
+    """
+
     def __init__(self, device: torch.device):
         self.device = device
 
@@ -16,6 +21,9 @@ class RandomPruningMetric(BaseMetric):
         pass
 
     def get_metric(self, dataset: Dataset):
+        """
+        Assigns a random number as metric to each datapoint.
+        """
 
         index_list = []
         metric_list = []
