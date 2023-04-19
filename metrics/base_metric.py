@@ -7,16 +7,41 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 
 class BaseMetric(ABC):
+    """
+    Base class for all the metrics (Abstract Class)
+    Implement train_step and get_metric to add your implementation of metric
+
+    (Must define a member called self.model 
+        whose parameters will be added to optimizer.
+    If not defined then override the get_optimizer method too.)
+    """
+
     @abstractmethod
     def train_step(self, train_loader: DataLoader, epoch: int):
+        """
+        Represents one epoch in the training loop 
+        """
         pass
 
     @abstractmethod
     def get_metric(self, dataset):
+        """
+        Returns the calculated metric for the dataset
+
+        returns:
+            tensor of indices in the dataset
+            tensor of respective metrics for the datapoints in dataset
+        """
         pass
 
     def get_optimizer(self):
-        # Hardcoding the optimizer (Can extend the class to overwrite it)
+        """
+        Returns the optimizer for the model
+        Hardcoding the optimizer (Can extend the class to overwrite it)
+
+        (Must define a member called self.model in the __init__ of subclass
+            If not defined then override the get_optimizer method too.)
+        """
         return optim.SGD(
             self.model.parameters(),
             lr=0.1,

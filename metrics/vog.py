@@ -10,9 +10,21 @@ from .base_metric import BaseMetric
 
 
 class VoGMetric(BaseMetric):
+    """
+    Implements the variance of gradients metric
+    """
+
     def __init__(
         self, model: nn.Module, device: torch.device, checkpoint_interval: int
     ):
+        """
+         Args:
+            model: probing model to be trained
+            device: device
+            checkpoint_interval: the epoch intervals at which 
+                to save the model checkpoint 
+        """
+
         self.model = copy.deepcopy(model)
         self.checkpoints = []
         self.device = device
@@ -43,6 +55,10 @@ class VoGMetric(BaseMetric):
             self.checkpoints.append(checkpoint)
 
     def get_metric(self, dataset: Dataset):
+        """
+        returns the vog metric
+        """
+
         index_list = []
         metric_list = []
 

@@ -9,15 +9,23 @@ from .base_metric import BaseMetric
 
 
 class EL2NMetric(BaseMetric):
+    """
+    Implements the ErrorL2Norm (EL2N) metric
+    """
+
     def __init__(self, model: nn.Module, num_models: int, device: torch.device):
+        """
+         Args:
+            model: probing model to be trained
+            num_models: the number of models to use in ensemble
+            device: device
+        """
 
         self.model = nn.ModuleList([copy.deepcopy(model) for _ in range(num_models)])
         self.device = device
         self.model = self.model.to(device)
         self.optimizer = self.get_optimizer()
-        # For EL2N loss is L2Norm or MSE Loss
         self.criterion = nn.MSELoss(reduction="none")
-        # Assuming during training different loss is used
         self.training_criterion = nn.CrossEntropyLoss()
 
     def train_step(self, train_loader: DataLoader, epoch: int):
@@ -40,6 +48,9 @@ class EL2NMetric(BaseMetric):
             self.optimizer.step()
 
     def get_metric(self, dataset: Dataset):
+        """
+        calculates the el2n metrics for the dataset
+        """
 
         index_list = []
         metric_list = []
