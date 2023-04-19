@@ -7,4 +7,6 @@ This is the code repo for the final project in CSC413 (Spring 2023). In this rep
 
 Few modifications have been done to the original code to suit our specific use case.
 
-N.B: Ignore the old_metrics_code folder. It contains rough/poc implementations of the metric which is not efficient.
+N.B: 
+- Don't change the folder structure or files. The relative positioning of the files and the folders is requires fo running the code. The clustering.py, models.py should be at the same level as the metrics package in directory. The ipynb files should be in the same level as the clustering.py and models.py files.
+- Ignore the old_metrics_code folder. It contains rough/poc implementations of the metric which is not efficient. This folder can be deleted without any repercussions.
